@@ -228,7 +228,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 		updateEncoderCnt();   // 👈 これを追加！
 		updateLineSensor(); // 👈 これを追加！
-		speedControlFlip(); // 👈 これを追加！(Encorder.cの関数)
+
 
 		// updateIMUValue();     // (ジャイロセンサーがあれば)
 
