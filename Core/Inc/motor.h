@@ -1,0 +1,28 @@
+/*
+ * motor.h
+ *
+ *  Created on: Nov 4, 2025
+ *      Author: raito
+ */
+
+#ifndef INC_MOTOR_H_
+#define INC_MOTOR_H_
+
+#include "stm32f4xx_hal.h"
+
+#define MAX_COUNTER_PERIOD 1399
+#define MIN_COUNTER_PERIOD -1399
+
+#define SUCTION_MOTOR_PERIOD 839
+
+#define STOP_COUNTER_PERIOD 0
+
+void initMotor(void);
+void motorCtrlFlip(void);
+void droneMotorCtrlFlip(void);
+void suctionmotorCtrlFlip(void);
+void setMotor(int16_t, int16_t);
+void setsuctionMotor(int16_t);
+
+
+#endif /* INC_MOTOR_H_ */

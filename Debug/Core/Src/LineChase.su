@@ -1,0 +1,7 @@
+../Core/Src/LineChase.c:28:6:calculateLineFollowingTermFlip	32	static
+../Core/Src/LineChase.c:58:6:lineTraceFlip	32	static
+../Core/Src/LineChase.c:110:6:startLineTrace	4	static
+../Core/Src/LineChase.c:116:6:stopLineTrace	4	static
+../Core/Src/LineChase.c:123:6:checkCourseOut	16	static
+../Core/Src/LineChase.c:139:6:debugmotor	16	static
+../Core/Src/LineChase.c:145:6:getCouseOutFlag	4	static

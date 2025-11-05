@@ -1,0 +1,13 @@
+../Core/Src/VelocityCtrl.c:31:6:calculateVelocityControlFlip	5
+../Core/Src/VelocityCtrl.c:79:7:getVelocityControlTerm	1
+../Core/Src/VelocityCtrl.c:84:7:getpidplus	1
+../Core/Src/VelocityCtrl.c:89:7:getTargetAcceleration	1
+../Core/Src/VelocityCtrl.c:94:6:setTargetVelocity	1
+../Core/Src/VelocityCtrl.c:99:6:setTargetAcceleration	1
+../Core/Src/VelocityCtrl.c:104:7:setvariablespeed	3
+../Core/Src/VelocityCtrl.c:116:7:getCurrentVelocity	1
+../Core/Src/VelocityCtrl.c:128:7:getTargetVelocity	1
+../Core/Src/VelocityCtrl.c:133:6:startVelocityControl	1
+../Core/Src/VelocityCtrl.c:139:6:stopVelocityControl	1
+../Core/Src/VelocityCtrl.c:144:6:setClearFlagOfVelocityControlI	1
+../Core/Src/VelocityCtrl.c:149:6:setrunmode	1
