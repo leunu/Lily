@@ -98,6 +98,13 @@ float black_values[LINE_SENSOR_NUM];
 // 正規化後のセンサー値 (0〜1000)
 volatile int16_t Linesensor[LINE_SENSOR_NUM];
 
+
+// エンコーダデバッグ用のグローバル変数--------------------------------
+int16_t debug_encoder_l = 0;
+int16_t debug_encoder_r = 0;
+float debug_velocity = 0.0f;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -214,6 +221,17 @@ void updateLinesensorCnt(void) {
 
 }
 
+
+void debugEncoder(void) {
+    // エンコーダの値を取得してグローバル変数に格納
+    getEncoderCnt(&debug_encoder_l, &debug_encoder_r);
+
+    // 現在の速度も取得（オプション）
+    debug_velocity = getCurrentVelocity();
+}
+
+
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	/* ==============================================
 	 * 1ms周期の「メイン制御」 (現場監督)
@@ -228,6 +246,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 		updateEncoderCnt();   // 👈 これを追加！
 		updateLineSensor(); // 👈 これを追加！
+
+        // デバッグ情報の更新
+        debugEncoder();
 
 
 		// updateIMUValue();     // (ジャイロセンサーがあれば)
