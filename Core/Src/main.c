@@ -76,7 +76,6 @@ int SW2_current = 1;
 int SW3_prev = 1;
 int SW3_current = 1;
 
-
 int M_R_drive = 0;
 int M_L_drive = 0;
 int M_L = 0;
@@ -98,12 +97,10 @@ float black_values[LINE_SENSOR_NUM];
 // 正規化後のセンサー値 (0〜1000)
 volatile int16_t Linesensor[LINE_SENSOR_NUM];
 
-
 // エンコーダデバッグ用のグローバル変数--------------------------------
 int16_t debug_encoder_l = 0;
 int16_t debug_encoder_r = 0;
 float debug_velocity = 0.0f;
-
 
 /* USER CODE END PV */
 
@@ -172,8 +169,6 @@ void sensorCalibration() {
 
 void updateLineSensor(void) {
 
-
-
 	// 正規化 (0〜1000)
 	Linesensor[0] = ((analog[0] - black_values[0]) / sensor_coefficient[0])
 			* 1000;
@@ -221,16 +216,13 @@ void updateLinesensorCnt(void) {
 
 }
 
-
 void debugEncoder(void) {
-    // エンコーダの値を取得してグローバル変数に格納
-    getEncoderCnt(&debug_encoder_l, &debug_encoder_r);
+	// エンコーダの値を取得してグローバル変数に格納
+	getEncoderCnt(&debug_encoder_l, &debug_encoder_r);
 
-    // 現在の速度も取得（オプション）
-    debug_velocity = getCurrentVelocity();
+	// 現在の速度も取得（オプション）
+	debug_velocity = getCurrentVelocity();
 }
-
-
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	/* ==============================================
@@ -247,9 +239,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		updateEncoderCnt();   // 👈 これを追加！
 		updateLineSensor(); // 👈 これを追加！
 
-        // デバッグ情報の更新
-        debugEncoder();
-
+		// デバッグ情報の更新
+		debugEncoder();
 
 		// updateIMUValue();     // (ジャイロセンサーがあれば)
 
@@ -301,6 +292,10 @@ void init(void) {
 
 	sensorCalibration();
 
+	clearspeedcount();
+	setTargetVelocity(-1.5);
+
+	setrunmode(1);
 
 	startVelocityControl(); //
 	startLineTrace(); //
@@ -380,9 +375,6 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-
-		setTargetVelocity(1.0); // (0.3m/sなど、ゆっくりした速度)
-
 
 
 		//部品実装当時の動作確認用コード-----------------------------------------------------------------------

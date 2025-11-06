@@ -45,7 +45,8 @@ void calculateVelocityControlFlip(void)
 			i_clear_flag = 0;
 		}
 
-		diff = setvariablespeed() - current_velocity;
+//		diff = setvariablespeed() - current_velocity;----------試験的にしたのに変更
+		diff = target_velocity - current_velocity;      // 👈 ★★★ この行に変更 ★★★
 		//mon_diff = diff;
 		p = kp * diff; //P制御
 		i += ki * diff * DELTA_T; //I制御
@@ -119,7 +120,7 @@ float getCurrentVelocity(void)
 	getEncoderCnt(&enc_l, &enc_r);
 	float enc_cnt = (enc_l + enc_r) / 2;
 
-	float current_velocity = VELOCITY_PER_CNT * enc_cnt;
+	float current_velocity = VELOCITY_PER_CNT * enc_cnt*(-1.0f);
 	mon_current_velocity = current_velocity;
 
 	return current_velocity;
