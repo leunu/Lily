@@ -65,7 +65,7 @@ UART_HandleTypeDef huart1;
 //どのモードで走行するかを後々格納する
 volatile uint16_t run_Mode = 0;
 //走行中かどうか(trueで走行)
-volatile bool running = true;
+volatile bool running = false;
 //システム起動からの経過時間
 volatile uint32_t systemTime = 0;
 //走行開始からの経過時間
@@ -271,6 +271,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// 走行開始からのタイマーをリセット
 			runningTime = 0;
 
+			stopVelocityControl(); //
+			stopLineTrace();       //
+			motorCtrlFlip();
 			// (モーターを確実に停止させる関数をここに呼ぶのが安全)
 			// stopMotor(); // (例: motorCtrlFlip(0, 0) をラップした関数)
 		}
@@ -290,20 +293,20 @@ void init(void) {
 
 	HAL_Delay(50);
 
-	sensorCalibration();
+//	sensorCalibration();
 
-	clearspeedcount();
-	setTargetVelocity(-1.5);
+//	clearspeedcount();
+//	setTargetVelocity(-1.5);
 
-	setrunmode(1);
+//	setrunmode(1);
 
-	startVelocityControl(); //
-	startLineTrace(); //
+//	startVelocityControl();
+//	startLineTrace(); //
 
 	initMotor(); // 👈 追加
 
 	// タイマー割り込みを開始
-	HAL_TIM_Base_Start_IT(&htim6);
+//	HAL_TIM_Base_Start_IT(&htim6);
 
 	// ... その他の初期化 ...
 }
@@ -375,7 +378,6 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-
 
 		//部品実装当時の動作確認用コード-----------------------------------------------------------------------
 //		SW2_current = HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin);
