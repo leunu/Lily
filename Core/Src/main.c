@@ -76,6 +76,9 @@ int SW2_current = 1;
 int SW3_prev = 1;
 int SW3_current = 1;
 
+volatile uint8_t robot_mode = 0; // ロボットの状態 (0:キャリブレーション待機, 1:走行待機, 2:走行中)
+volatile uint8_t sw_state = 0;   // スイッチの状態を保持する変数
+
 int M_R_drive = 0;
 int M_L_drive = 0;
 int M_L = 0;
@@ -275,6 +278,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			stopLineTrace();       //
 			motorCtrlFlip();
 			// (モーターを確実に停止させる関数をここに呼ぶのが安全)
+
+			HAL_TIM_Base_Stop_IT(&htim6); // 1msタイマー自体を停止これいるか？？？
 			// stopMotor(); // (例: motorCtrlFlip(0, 0) をラップした関数)
 		}
 	}
@@ -379,57 +384,76 @@ int main(void) {
 
 		/* USER CODE BEGIN 3 */
 
-		//部品実装当時の動作確認用コード-----------------------------------------------------------------------
-//		SW2_current = HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin);
-//		SW3_current = HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin);
-//
-//		Enc_L = TIM3->CNT;
-//		Enc_R = TIM4->CNT;
-//
-//		if (SW2_prev == 1 && SW2_current == 0) {
-//			// M_R の状態を反転させる (0 なら 1 に、1 なら 0 に)
-//			M_R = !M_R;
-//			LED = !LED;
-//		}
-//		// 「直前の状態」を「今の状態」で更新する
-//		SW2_prev = SW2_current;
-//
-//		// 3. SW3 (左モータ) のエッジ検出
-//		if (SW3_prev == 1 && SW3_current == 0) {
-//			M_L = !M_L; // 状態を反転
-//		}
-//		SW3_prev = SW3_current;
-//
-//		if (LED == 1) {
-//			HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, RESET);
-//			HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, RESET);
-//			HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, RESET);
-//			HAL_GPIO_WritePin(LED_4_GPIO_Port, LED_4_Pin, RESET);
-//			HAL_GPIO_WritePin(LED_5_GPIO_Port, LED_5_Pin, RESET);
-//		} else {
-//			HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, SET);
-//			HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET);
-//			HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, SET);
-//			HAL_GPIO_WritePin(LED_4_GPIO_Port, LED_4_Pin, SET);
-//			HAL_GPIO_WritePin(LED_5_GPIO_Port, LED_5_Pin, SET);
-//
-//		}
-//
-//		if (M_R == 1) {
-//			M_R_drive = 200;
-//		} else {
-//			M_R_drive = 0;
-//		}
-//
-//		if (M_L == 1) {
-//			M_L_drive = 200;
-//		} else {
-//			M_L_drive = 0;
-//		}
-//
-//		__HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, M_R_drive);
-//		__HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_4, M_L_drive);
-//----------------------------------------------------------------------------------------------------------------------
+		// 1. スイッチ状態を読み取る (switch.cの関数)
+		// (もし `getSwitchState` が無ければ `sw_state = getSwitchStatus('L');` で代用)
+		sw_state = getSwitchStatus('L');
+
+		// --- ゴール/脱線チェック ---
+		// 1ms割り込みが 'running=false' にしたら、モードを「走行待ち」に戻す
+		if (robot_mode == 2 && running == false) {
+			robot_mode = 1; // 走行待ち状態に戻る
+		}
+
+		// --- ロボットの状態で処理を分岐 ---
+		switch (robot_mode) {
+
+		case 0: // 【状態0: キャリブレーション待ち】
+			setLED('B'); // (例: 青色LED点灯)
+
+			// (sw_state & 0x01) は「左スイッチが押されている」
+			if (sw_state == 1) {
+				setLED('R'); // (赤色LED点灯)
+
+				// 2. キャリブレーション実行 (140行目 の関数。スイッチが離されるまで待機する)
+				sensorCalibration();
+
+				// 3. キャリブレーション完了 (スイッチが離された)
+				robot_mode = 1; // 👈 「走行待ち」状態へ
+				setLED('Y'); // (黄色LED点灯)
+				HAL_Delay(200);  // スイッチのチャタリング防止
+			}
+			break;
+
+		case 1: // 【状態1: 走行待ち (キャリブレーション完了 or 走行停止後)】
+			setLED('Y'); // (黄色LED点灯)
+
+			// (sw_state & 0x01) は「左スイッチが押されている」
+			if (sw_state & 0x01) {
+
+				// --- 走行準備の "init" をここに集約 ---
+				setLED('G'); // (緑色LED点灯)
+
+				clearspeedcount();       // 加速ランプをリセット
+				setTargetVelocity(-1.0); // 走行速度をセット (マイナスで前進)
+				setrunmode(1);           // 速度制御モードをセット
+
+				startVelocityControl(); // 速度制御ON
+				startLineTrace();       // ライン追従ON
+
+				// (※※※ 将来、ゴール判定ロジックのリセットをここで行う ※※※)
+				// (例: resetGoalFlags(); )
+
+				// --- 走行開始 ---
+				running = true; // 👈 1ms割り込み内の制御を有効化
+				HAL_TIM_Base_Start_IT(&htim6); // 👈 1msタイマーをスタート
+
+				robot_mode = 2; // 👈 「走行中」状態へ
+				HAL_Delay(200); // スイッチのチャタリング防止
+			}
+			break;
+
+		case 2: // 【状態2: 走行中】
+			// 1ms割り込みが 'running=true' で走行中。
+			// 'while(1)' ループは、'running' が 'false' になるのを待つだけ。
+			// (LEDは緑のまま)
+			break;
+		}
+
+		HAL_Delay(10); // while(1)ループを少し遅くする (CPU負荷軽減とチャタリング防止)
+
+		/* (古いデバッグコードは削除) */
+
+
 	}
 	/* USER CODE END 3 */
 }
