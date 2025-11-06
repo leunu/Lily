@@ -65,7 +65,7 @@ UART_HandleTypeDef huart1;
 //どのモードで走行するかを後々格納する
 volatile uint16_t run_Mode = 0;
 //走行中かどうか(trueで走行)
-volatile bool running = false;
+volatile bool running = true;
 //システム起動からの経過時間
 volatile uint32_t systemTime = 0;
 //走行開始からの経過時間
@@ -280,7 +280,7 @@ void init(void) {
 
 	sensorCalibration();
 
-	setTargetVelocity(1.0); // (0.3m/sなど、ゆっくりした速度)
+
 	startVelocityControl(); //
 	startLineTrace(); //
 
@@ -359,6 +359,10 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
+
+		setTargetVelocity(1.0); // (0.3m/sなど、ゆっくりした速度)
+
+
 
 		//部品実装当時の動作確認用コード-----------------------------------------------------------------------
 //		SW2_current = HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin);
