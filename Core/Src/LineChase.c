@@ -29,7 +29,10 @@ void calculateLineFollowingTermFlip(void){
 	float p, d;
 	static float i;
 
-	float kp = 0.3, kd = 0.03;//kp = 1.5, kd = 0.0015  //kp = 3.0, kd = 0.005
+//	float kp = 0.7, kd = 0.01;//1.0
+//	float kp = , kd = ;//
+//	float kp = , kd = ;//
+	float kp = 0.7, kd = 0.01;
 	float diff = 0.;
 
 	if(line_trace_enable_flag == 1){
@@ -117,7 +120,7 @@ void stopLineTrace()
 {
 	line_trace_enable_flag = 0;
 	line_following_term = 0;
-	//setMotor(0, 0);
+	setMotor(0, 0);
 }
 
 void checkCourseOut(void)
@@ -126,7 +129,7 @@ void checkCourseOut(void)
 	static uint16_t dark_cnt;
 
 	all_sensor = (Linesensor[0] + Linesensor[1] + Linesensor[2] + Linesensor[3] + Linesensor[4] + Linesensor[5] + Linesensor[6] + Linesensor[7] + Linesensor[8] + Linesensor[9] + Linesensor[10] + Linesensor[11] + Linesensor[12] + Linesensor[13] + Linesensor[14] + Linesensor[15]) / 16;
-	if(all_sensor > 900){
+	if(all_sensor > 800){
 		dark_cnt++;
 	}
 	else dark_cnt = 0;
