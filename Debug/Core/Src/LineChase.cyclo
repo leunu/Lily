@@ -1,7 +1,7 @@
 ../Core/Src/LineChase.c:28:6:calculateLineFollowingTermFlip	5
-../Core/Src/LineChase.c:58:6:lineTraceFlip	6
-../Core/Src/LineChase.c:110:6:startLineTrace	1
-../Core/Src/LineChase.c:116:6:stopLineTrace	1
-../Core/Src/LineChase.c:123:6:checkCourseOut	4
-../Core/Src/LineChase.c:139:6:debugmotor	1
-../Core/Src/LineChase.c:145:6:getCouseOutFlag	1
+../Core/Src/LineChase.c:61:6:lineTraceFlip	6
+../Core/Src/LineChase.c:113:6:startLineTrace	1
+../Core/Src/LineChase.c:119:6:stopLineTrace	1
+../Core/Src/LineChase.c:126:6:checkCourseOut	4
+../Core/Src/LineChase.c:142:6:debugmotor	1
+../Core/Src/LineChase.c:148:6:getCouseOutFlag	1

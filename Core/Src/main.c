@@ -71,6 +71,15 @@ volatile uint32_t systemTime = 0;
 //走行開始からの経過時間
 volatile uint32_t runningTime = 0;
 
+volatile bool side_sensor_L = false;          // 左サイドセンサの状態
+volatile bool side_sensor_R = false;          // 右サイドセンサの状態
+volatile uint8_t goal_logic_state = 0;       // ゴール判定のステートマシン (先輩の 'pattern' 相当)
+volatile uint16_t start_goal_line_cnt = 0;    // 右ラインの通過回数
+volatile bool goal_judge_flag = false;      // ゴール判定の補助フラグ
+volatile bool is_goal = false;                // ゴールが確定したかどうかのフラグ
+
+volatile bool cross_line_ignore_flag = false; // クロスラインを無視する期間か
+
 int SW2_prev = 1;
 int SW2_current = 1;
 int SW3_prev = 1;
@@ -219,6 +228,96 @@ void updateLinesensorCnt(void) {
 
 }
 
+void updateSideSensors(void) {
+	// GPIOピンを読む (あなたのピン定義 に合わせる)
+	// (LOWで反応 = 白線 と仮定)
+	if (HAL_GPIO_ReadPin(Side_sensor2_GPIO_Port, Side_sensor2_Pin)
+			== GPIO_PIN_RESET) {
+		side_sensor_L = true; // 左が白線
+	} else {
+		side_sensor_L = false;
+	}
+
+	if (HAL_GPIO_ReadPin(Side_sensor1_GPIO_Port, Side_sensor1_Pin)
+			== GPIO_PIN_RESET) {
+		side_sensor_R = true; // 右が白線
+	} else {
+		side_sensor_R = false;
+	}
+
+}
+
+void checkGoalLogic(void) {
+	switch (goal_logic_state) {
+
+	case 0: // 【状態0: スタートライン待ち】
+		if (side_sensor_R == true) { // 右センサ(スタートライン)に反応したら
+			start_goal_line_cnt = 1;      // 1回目をカウント
+			clearGoalJudgeDistance();     // 距離リセット
+			clearSideLineJudgeDistance(); //
+			goal_logic_state = 5;         // 次の状態へ
+		}
+		break;
+
+	case 5: // 【状態5: スタートラインを抜けきるのを待つ】
+		if (side_sensor_R == false) { // 右センサが途切れたら
+			goal_logic_state = 10;    // 次の状態へ
+		}
+		break;
+
+	case 10: // 【状態10: 走行中（ゴール待ち）】
+
+		// --- ★ これが「クロス判定」 ★ ---
+		if (side_sensor_L == true) { // ⚠️ もし左センサが反応したら(＝クロスライン)
+			goal_judge_flag = false;
+			clearGoalJudgeDistance(); // 👈 ゴール判定用の距離タイマーをリセット
+		}
+		// ---
+
+		// --- ★ これが「ゴール判定」 ★ ---
+		// (左に邪魔されず) 右センサが反応し、かつ(左から)70mm以上離れていたら
+		if (goal_judge_flag == false && side_sensor_R == true
+				&& getGoalJudgeDistance() >= 70) {
+			goal_judge_flag = true; // ゴール候補
+			clearGoalJudgeDistance();
+		}
+		// ゴール候補のまま、さらに70mm進んだら (＝ゴールライン確定)
+		else if (goal_judge_flag == true && getGoalJudgeDistance() >= 70) {
+			start_goal_line_cnt = 2; // 2回目をカウント
+			goal_judge_flag = false;
+			clearGoalJudgeDistance();
+		}
+
+		if (start_goal_line_cnt >= 2) { // 👈 2回カウントしたら
+			goal_logic_state = 20;    // 停止状態へ
+		}
+		break;
+		// ---
+
+	case 20: // 【状態20: ゴール検知】
+		is_goal = true; // 👈 ゴールフラグを立てる
+		break;
+	}
+}
+
+/**
+ * @brief ゴールフラグを返す
+ */
+bool getGoalStatus(void) {
+	return is_goal;
+}
+
+/**
+ * @brief ゴールロジックを初期化する (走行開始時に呼ぶ)
+ */
+void initGoalLogic(void) {
+	goal_logic_state = 0;
+	start_goal_line_cnt = 0;
+	goal_judge_flag = false;
+	is_goal = false;
+	clearGoalJudgeDistance();
+}
+
 void debugEncoder(void) {
 	// エンコーダの値を取得してグローバル変数に格納
 	getEncoderCnt(&debug_encoder_l, &debug_encoder_r);
@@ -241,6 +340,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 		updateEncoderCnt();   // 👈 これを追加！
 		updateLineSensor(); // 👈 これを追加！
+		updateSideSensors();
 
 		// デバッグ情報の更新
 		debugEncoder();
@@ -268,7 +368,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			// コースアウト検知
 			checkCourseOut(); // 👈 存在する関数を呼び出す
-			if (getCouseOutFlag() == true) {
+			checkGoalLogic();
+			if (getCouseOutFlag() == true || getGoalStatus() == true) { // 👈 ★★★ このように変更 ★★★
 				running = false; // 👈 runningフラグを倒す
 			}
 
@@ -428,15 +529,14 @@ int main(void) {
 				setLED('M'); // (マゼンタLED点灯)
 
 				clearspeedcount();       // 加速ランプをリセット
-				setTargetVelocity(-1.5); // 走行速度をセット (マイナスで前進)
+				setTargetVelocity(-1.0); // 走行速度をセット (マイナスで前進)
 				setrunmode(1);           // 速度制御モードをセット
 
 				startVelocityControl(); // 速度制御ON
 				startLineTrace();       // ライン追従ON
 
 				// (※※※ 将来、ゴール判定ロジックのリセットをここで行う ※※※)
-				// (例: resetGoalFlags(); )
-
+				initGoalLogic();
 				// --- 走行開始 ---
 				running = true; // 👈 1ms割り込み内の制御を有効化
 				HAL_TIM_Base_Start_IT(&htim6); // 👈 1msタイマーをスタート
