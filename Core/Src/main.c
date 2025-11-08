@@ -247,15 +247,48 @@ void updateSideSensors(void) {
 
 }
 
+bool isCrossLine(void) {
+	static uint16_t cnt = 0;
+	// センサ 1個目 (Linesensor[0]) と 16個目 (Linesensor[15]) をチェック
+	float sensor_edge_val_l = Linesensor[0];
+	float sensor_edge_val_r = Linesensor[15];
+	static bool flag = false;
+
+	// 正規化後は「白 = 1000」 なので、 200以上を「白線」とみなす
+	if (sensor_edge_val_l < 200 && sensor_edge_val_r < 200) {
+		cnt++;
+	} else {
+		cnt = 0;
+	}
+
+	if (cnt >= 5) { // 10ms連続で両端が白ならクロスと判定
+		flag = true;
+	} else {
+		flag = false;
+	}
+	return flag;
+}
+
 void checkGoalLogic(void) {
+
+	// --- 1. クロス無視タイマーの管理 (70mmで解除) ---
+	if (cross_line_ignore_flag == true && getCrossLineIgnoreDistance() >= 70) {
+		cross_line_ignore_flag = false; // 無視フラグを解除
+	}
+
+	// --- 2. ゴール判定ステートマシン (最優先で実行) ---
 	switch (goal_logic_state) {
 
 	case 0: // 【状態0: スタートライン待ち】
-		if (side_sensor_R == true) { // 右センサ(スタートライン)に反応したら
+		// (無視期間中 *ではない* 時に、右センサが反応したら)
+		if (cross_line_ignore_flag == false && side_sensor_R == true) {
 			start_goal_line_cnt = 1;      // 1回目をカウント
 			clearGoalJudgeDistance();     // 距離リセット
-			clearSideLineJudgeDistance(); //
 			goal_logic_state = 5;         // 次の状態へ
+
+			// スタートライン自体も「クロス」として扱い、無視タイマーを開始
+			cross_line_ignore_flag = true;
+			clearCrossLineIgnoreDistance();
 		}
 		break;
 
@@ -267,29 +300,40 @@ void checkGoalLogic(void) {
 
 	case 10: // 【状態10: 走行中（ゴール待ち）】
 
-		// --- ★ これが「クロス判定」 ★ ---
-		if (side_sensor_L == true) { // ⚠️ もし左センサが反応したら(＝クロスライン)
-			goal_judge_flag = false;
-			clearGoalJudgeDistance(); // 👈 ゴール判定用の距離タイマーをリセット
-		}
-		// ---
+		// --- ★ A. 「ゴール判定」 (最優先) ★ ---
+		// (クロス無視期間中 *ではない* 時に)
+		// (ゴール候補フラグが *立っておらず*)
+		// (右センサが反応し) かつ (70mm以上経過していたら)
+		if (cross_line_ignore_flag == false && goal_judge_flag == false
+				&& side_sensor_R == true && getGoalJudgeDistance() >= 70) {
 
-		// --- ★ これが「ゴール判定」 ★ ---
-		// (左に邪魔されず) 右センサが反応し、かつ(左から)70mm以上離れていたら
-		if (goal_judge_flag == false && side_sensor_R == true
-				&& getGoalJudgeDistance() >= 70) {
 			goal_judge_flag = true; // ゴール候補
 			clearGoalJudgeDistance();
 		}
-		// ゴール候補のまま、さらに70mm進んだら (＝ゴールライン確定)
+		// (ゴール候補のまま、さらに70mm進んだら ＝ ゴールライン確定)
 		else if (goal_judge_flag == true && getGoalJudgeDistance() >= 70) {
 			start_goal_line_cnt = 2; // 2回目をカウント
 			goal_judge_flag = false;
 			clearGoalJudgeDistance();
 		}
 
-		if (start_goal_line_cnt >= 2) { // 👈 2回カウントしたら
+		// 2回カウントしたらゴール状態へ
+		if (start_goal_line_cnt >= 2) {
 			goal_logic_state = 20;    // 停止状態へ
+			break; // 👈 ゴール確定。以下のクロス判定は実行しない
+		}
+		// ---
+
+		// --- ★ B. 「(ゴールでなければ) クロス判定」 ★ ---
+		// (要望のあった isCrossLine() と、既存の side_sensor_L の両方で判定)
+		if ((isCrossLine() == true || side_sensor_L == true)
+				&& cross_line_ignore_flag == false) {
+
+			// どちらかが反応し、かつ無視期間中でなければ
+			cross_line_ignore_flag = true;    // 👈 無視期間スタート
+			clearCrossLineIgnoreDistance(); // 👈 タイマースタート
+			goal_judge_flag = false;        // 👈 ゴール判定をリセット
+			clearGoalJudgeDistance();     // 👈 ゴール距離タイマーもリセット
 		}
 		break;
 		// ---
@@ -316,6 +360,9 @@ void initGoalLogic(void) {
 	goal_judge_flag = false;
 	is_goal = false;
 	clearGoalJudgeDistance();
+
+	cross_line_ignore_flag = false;
+	clearCrossLineIgnoreDistance();
 }
 
 void debugEncoder(void) {
@@ -326,7 +373,7 @@ void debugEncoder(void) {
 	debug_velocity = getCurrentVelocity();
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {//----------------------------------------
 	/* ==============================================
 	 * 1ms周期の「メイン制御」 (現場監督)
 	 * ============================================== */
@@ -529,7 +576,7 @@ int main(void) {
 				setLED('M'); // (マゼンタLED点灯)
 
 				clearspeedcount();       // 加速ランプをリセット
-				setTargetVelocity(-1.0); // 走行速度をセット (マイナスで前進)
+				setTargetVelocity(-0.8); // 走行速度をセット (マイナスで前進)
 				setrunmode(1);           // 速度制御モードをセット
 
 				startVelocityControl(); // 速度制御ON
