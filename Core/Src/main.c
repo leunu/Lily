@@ -576,7 +576,7 @@ int main(void) {
 				setLED('M'); // (マゼンタLED点灯)
 
 				clearspeedcount();       // 加速ランプをリセット
-				setTargetVelocity(-0.8); // 走行速度をセット (マイナスで前進)
+				setTargetVelocity(-1.0); // 走行速度をセット (マイナスで前進)
 				setrunmode(1);           // 速度制御モードをセット
 
 				startVelocityControl(); // 速度制御ON
